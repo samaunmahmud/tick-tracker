@@ -49,25 +49,14 @@ GET {{baseUrl}}/api/sightings?city=Atlantis&from=2024-12-31&to=2024-01-01&sort=s
 
 ### Sightings: report a new sighting (201)
 POST {{baseUrl}}/api/sightings
-Content-Type: multipart/form-data; boundary=boundary
+Content-Type: application/json
 
---boundary
-Content-Disposition: form-data; name="sightedAt"
-
-2024-06-01T10:30:00
---boundary
-Content-Disposition: form-data; name="city"
-
-leeds
---boundary
-Content-Disposition: form-data; name="species"
-
-Marsh tick
---boundary
-Content-Disposition: form-data; name="notes"
-
-Found on a dog after a walk
---boundary--
+{
+  "sightedAt": "2024-06-01T10:30:00",
+  "city": "leeds",
+  "species": "Marsh tick",
+  "notes": "Found on a dog after a walk"
+}
 
 > {% client.global.set("sightingId", response.body.id); %}
 
@@ -76,39 +65,29 @@ GET {{baseUrl}}/api/sightings/{{sightingId}}
 
 ### Sightings: report the same sighting again (409)
 POST {{baseUrl}}/api/sightings
-Content-Type: multipart/form-data; boundary=boundary
+Content-Type: application/json
 
---boundary
-Content-Disposition: form-data; name="sightedAt"
-
-2024-06-01T10:30:00
---boundary
-Content-Disposition: form-data; name="city"
-
-Leeds
---boundary
-Content-Disposition: form-data; name="species"
-
-Marsh tick
---boundary--
+{
+  "sightedAt": "2024-06-01T10:30:00",
+  "city": "Leeds",
+  "species": "Marsh tick"
+}
 
 ### Sightings: invalid report (400: future date, unknown city and species)
 POST {{baseUrl}}/api/sightings
-Content-Type: multipart/form-data; boundary=boundary
+Content-Type: application/json
 
---boundary
-Content-Disposition: form-data; name="sightedAt"
+{
+  "sightedAt": "2099-01-01T00:00:00",
+  "city": "Atlantis",
+  "species": "Dragon tick"
+}
 
-2099-01-01T00:00:00
---boundary
-Content-Disposition: form-data; name="city"
+### Sightings: malformed JSON (400)
+POST {{baseUrl}}/api/sightings
+Content-Type: application/json
 
-Atlantis
---boundary
-Content-Disposition: form-data; name="species"
-
-Dragon tick
---boundary--
+{ "sightedAt": "2024-06-01T10:30:00", "city":
 
 ### Sightings: unknown id (404)
 GET {{baseUrl}}/api/sightings/00000000-0000-0000-0000-000000000000

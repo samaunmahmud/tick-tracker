@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -69,13 +70,13 @@ public class SightingController {
             description = "Region, coordinates and latin name are filled in by the server. The Location header "
                     + "points at the new sighting.")
     @ApiResponse(responseCode = "201", description = "Created")
-    @ApiResponse(responseCode = "400", description = "Missing or invalid fields, unknown city or species, "
-            + "or a date in the future",
+    @ApiResponse(responseCode = "400", description = "Malformed JSON, missing or invalid fields, unknown city or "
+            + "species, or a date in the future",
             content = @Content(schema = @Schema(implementation = ApiError.class)))
     @ApiResponse(responseCode = "409", description = "A sighting with the same time, city and species already exists",
             content = @Content(schema = @Schema(implementation = ApiError.class)))
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<SightingResponse> report(@Valid @ModelAttribute SightingReportRequest request) {
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<SightingResponse> report(@Valid @RequestBody SightingReportRequest request) {
         SightingResponse created = sightingService.report(request);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
                 .path("/{id}")
