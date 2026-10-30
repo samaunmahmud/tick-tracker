@@ -55,7 +55,7 @@ User reports through `POST /api/sightings` go through the same validation and th
 - **Search** builds a JPA Specification from the optional filters (date range, city, region, species) and returns my own page record, not Spring's `Page`, so the JSON shape is under my control.
 - **Insights** are SQL queries through `NamedParameterJdbcTemplate`. Grouping, `date_trunc` for week, month and year, and `generate_series` for zero-filling all happen in Postgres. Search and insights share one filter parser, so a filter means the same thing everywhere.
 - **Predictions** reuse the zero-filled monthly trend from `InsightsService`, and the statistics (seasonal profile, linear trend, back-test, Poisson tests, Benjamini-Hochberg) are plain Java. Each response includes a `method` and a `caveat` field in plain English.
-- **Swagger UI** is generated from the controllers and is the way to explore the API. There is no frontend.
+- **Swagger UI** is generated from the controllers, so the endpoints and parameters always match the code, and it is the way to explore the API. There is no frontend.
 
 ## Key decisions and trade-offs
 
@@ -101,7 +101,7 @@ Everything goes through `GlobalExceptionHandler`. Validation problems are a 400 
 
 ### 8. Honest predictions
 
-I added a forecast and anomaly detection, but evaluated both before trusting them. The forecast is back-tested on the last 12 months against two baselines, and on this data the simple historical monthly average wins (MAE 2.42 against 2.47 for my model), so the API says so. Anomaly detection runs thousands of Poisson tests, so it corrects with Benjamini-Hochberg: 58 city-months look significant without correction and none do after. Building something that reports "no signal" felt more useful than something that invents one.
+I added a forecast and anomaly detection, but evaluated both before trusting them. The forecast is back-tested on the last 12 months against two baselines, and on this data the simple historical monthly average wins (MAE 2.42 against 2.47 for my model), so the API says so. Anomaly detection runs thousands of Poisson tests, so it corrects with Benjamini-Hochberg: 58 city-months have a raw p below 0.05, which is within what chance alone could produce (up to about 108), and none survive the correction. Building something that reports "no signal" felt more useful than something that invents one.
 
 ## Screenshots
 

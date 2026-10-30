@@ -32,6 +32,25 @@ cd backend
 ./mvnw spring-boot:run
 ```
 
+## Data source and configuration
+
+The data comes from the Elanco tick sightings API at https://dev-task.elancoapps.com (the records are under `/data`). It is public and needs no key.
+
+The settings live in `backend/src/main/resources/application.yml`, and these can be overridden with environment variables:
+
+| Variable | Default | What it sets |
+|---|---|---|
+| `ELANCO_API_BASE_URL` | `https://dev-task.elancoapps.com/data` | Where sightings are fetched from |
+| `SYNC_ON_STARTUP` | `true` | Whether a sync runs when the app starts |
+| `DB_URL` | `jdbc:postgresql://localhost:5432/ticktracker` | Database connection (Docker Compose sets `jdbc:postgresql://db:5432/ticktracker`) |
+| `DB_USER` | `ticktracker` | Database user |
+| `DB_PASSWORD` | `ticktracker` | Database password |
+| `CORS_ORIGINS` | `http://localhost:5173,http://localhost:3000` | Browser origins allowed to call the API |
+
+`docker-compose.yml` sets the three database variables for the API container and passes `ELANCO_API_BASE_URL` through from your shell. To change any other variable when running in Docker, add it under `api.environment` in that file.
+
+The sync schedule is `app.elanco.sync-cron` in `application.yml`, and it defaults to `0 0 */6 * * *` (every 6 hours). The retry settings sit next to it: 5 attempts, backoff from 5s up to 60s, a 5s connect timeout and a 20s read timeout.
+
 ## Running tests
 
 ```bash
@@ -103,16 +122,17 @@ More detail and trade-offs are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 - **Rate limiting is real but intermittent.** I saw 8 out of 25 rapid requests get a 429 on one check, and 0 out of 100 on another.
 - **Region counts:** East Midlands 156, Scotland 151, North West 145, Yorkshire and the Humber 128, West Midlands 82, South West 77, London 76, Wales 71, North East 57, South East 57.
 - **Seasonality is flat.** The quietest calendar month is May with 66, and the busiest is December with 100. The calendar month explains only 6 to 9% of the month-to-month variation, and the yearly totals have no clear trend (R² about 0.01).
-- **Forecast back-test** (trained on 2012 to 2023, tested on 2024), as mean absolute error in sightings per month:
+- **No anomalies after correction.** At the city level, 2165 city-months were tested. 58 had a raw p below 0.05, which is within what chance alone could produce (up to about 108), and none survived Benjamini-Hochberg. At the region level, 1542 were tested, 40 had a raw p below 0.05 and none survived. The data looks like random variation.
 
-  | Model | MAE |
-  |---|---|
-  | historical monthly average | **2.42** |
-  | seasonal-trend (mine) | 2.47 |
-  | same month last year | 3.67 |
+**Forecast back-test** (trained on 2012 to 2023, tested on 2024), as mean absolute error in sightings per month:
 
-  My seasonal-trend model is no better than the plain average for each calendar month, because there is almost no seasonal pattern or trend for it to use.
-- **No anomalies after correction.** At the city level, 2165 city-months were tested. 58 had a raw p below 0.05, which is fewer than the 108 you'd expect by chance alone, and none survived Benjamini-Hochberg. At the region level, 1542 were tested, 40 had a raw p below 0.05 and none survived. The data looks like random variation.
+| Model | MAE |
+|---|---|
+| historical monthly average | **2.42** |
+| seasonal-trend (mine) | 2.47 |
+| same month last year | 3.67 |
+
+My seasonal-trend model is no better than the plain average for each calendar month, because there is almost no seasonal pattern or trend for it to use.
 
 ## Tech stack
 
@@ -123,7 +143,7 @@ More detail and trade-offs are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | Migrations | Flyway | The schema is versioned SQL, and Hibernate only validates against it |
 | Data access | Spring Data JPA, and `NamedParameterJdbcTemplate` for insights | JPA for simple reads and writes, plain SQL where aggregation is clearer in SQL |
 | HTTP client | Spring `RestClient` | Built in, with timeouts and easy access to status codes for the retry logic |
-| API docs | springdoc-openapi (Swagger UI) | Generated from the code, so it can't drift out of date |
+| API docs | springdoc-openapi (Swagger UI) | Generated from the controllers, so the endpoints and parameters always match the code |
 | Testing | JUnit 5, AssertJ, Mockito, MockMvc, Testcontainers | Fast unit tests, controller tests without a server, and SQL tested against a real Postgres |
 | Running | Docker Compose | One command starts the database and the API |
 | CI | GitHub Actions | Runs the full suite, including the Testcontainers tests, on every PR |
@@ -150,7 +170,7 @@ CI runs the same `./mvnw test` on every pull request and every push to `main`.
 
 ## Use of AI
 
-I built this with Claude Code as a coding assistant. I made the design decisions, directed each step, and reviewed and tested the code, and Claude Code wrote most of it under that direction. I've gone through the code so that I can explain how and why every part works.
+I used an AI coding assistant during this project. I made the design decisions, directed each step, and reviewed and tested everything it produced. I've worked through the code so I can explain how and why each part works.
 
 ## Video walkthrough
 
