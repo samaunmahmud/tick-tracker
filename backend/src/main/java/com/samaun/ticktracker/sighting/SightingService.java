@@ -63,6 +63,10 @@ public class SightingService {
                 .map(SightingResponse::from));
     }
 
+    public long totalSightings() {
+        return repository.count();
+    }
+
     public SightingResponse findById(UUID id) {
         return repository.findById(id)
                 .map(SightingResponse::from)

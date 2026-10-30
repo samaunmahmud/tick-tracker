@@ -7,6 +7,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class SyncHistoryService {
@@ -23,6 +24,10 @@ public class SyncHistoryService {
         return syncRunRepository.findTop20ByOrderByStartedAtDesc().stream()
                 .map(SyncRunResponse::from)
                 .toList();
+    }
+
+    public Optional<SyncRunResponse> latestRun() {
+        return syncRunRepository.findFirstByOrderByStartedAtDesc().map(SyncRunResponse::from);
     }
 
     public SyncRunResponse findRun(Long id) {
