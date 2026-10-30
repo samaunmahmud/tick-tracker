@@ -3,25 +3,31 @@ package com.samaun.ticktracker.sync;
 import com.samaun.ticktracker.common.NotFoundException;
 import com.samaun.ticktracker.common.PageResponse;
 import com.samaun.ticktracker.common.SyncInProgressException;
+import com.samaun.ticktracker.config.ClockConfig;
 import com.samaun.ticktracker.ingestion.IngestionService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
 import java.util.List;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.endsWith;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(SyncController.class)
+@Import(ClockConfig.class)
 class SyncControllerTest {
 
     private static final Instant STARTED = Instant.parse("2026-10-30T12:00:00Z");
@@ -103,5 +109,37 @@ class SyncControllerTest {
         mockMvc.perform(get("/api/sync/rejected").param("size", "500"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("size"));
+    }
+
+    @Test
+    void nonNumericRunIdIsReportedAsAFieldError() throws Exception {
+        mockMvc.perform(get("/api/sync/runs/abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("id"))
+                .andExpect(jsonPath("$.fieldErrors[0].message").value("has an invalid value 'abc'"))
+                .andExpect(content().string(not(containsString("java."))));
+    }
+
+    @Test
+    void nonNumericPageSizeIsReportedAsAFieldError() throws Exception {
+        mockMvc.perform(get("/api/sync/rejected").param("size", "abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("size"))
+                .andExpect(jsonPath("$.fieldErrors[0].message").value("has an invalid value 'abc'"));
+    }
+
+    @Test
+    void unexpectedErrorReturns500WithoutInternalDetails() throws Exception {
+        when(syncHistoryService.latestRuns())
+                .thenThrow(new IllegalStateException("connection to db failed, password=hunter2"));
+
+        mockMvc.perform(get("/api/sync/runs"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.message").value("Something went wrong"))
+                .andExpect(jsonPath("$.fieldErrors").isEmpty())
+                .andExpect(content().string(not(containsString("hunter2"))))
+                .andExpect(content().string(not(containsString("IllegalStateException"))));
     }
 }

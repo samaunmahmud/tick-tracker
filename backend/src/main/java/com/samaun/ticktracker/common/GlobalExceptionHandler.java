@@ -17,12 +17,19 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import java.time.Clock;
 import java.util.List;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    private final Clock clock;
+
+    public GlobalExceptionHandler(Clock clock) {
+        this.clock = clock;
+    }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> handleValidation(MethodArgumentNotValidException ex) {
@@ -67,14 +74,21 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.CONFLICT, ex.getMessage(), List.of());
     }
 
-    @ExceptionHandler({MethodArgumentTypeMismatchException.class, HttpMessageNotReadableException.class})
-    public ResponseEntity<ApiError> handleBadRequest(Exception ex) {
-        return build(HttpStatus.BAD_REQUEST, "Malformed request: " + ex.getMessage(), List.of());
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiError> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        return build(HttpStatus.BAD_REQUEST, "Validation failed",
+                List.of(new ApiError.FieldError(ex.getName(), "has an invalid value '" + ex.getValue() + "'")));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiError> handleUnreadableBody(HttpMessageNotReadableException ex) {
+        return build(HttpStatus.BAD_REQUEST, "Malformed request body", List.of());
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<ApiError> handleMissingParam(MissingServletRequestParameterException ex) {
-        return build(HttpStatus.BAD_REQUEST, ex.getMessage(), List.of());
+        return build(HttpStatus.BAD_REQUEST, "Validation failed",
+                List.of(new ApiError.FieldError(ex.getParameterName(), "is required")));
     }
 
     @ExceptionHandler(NotFoundException.class)
@@ -94,7 +108,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ApiError> handleTooLarge(MaxUploadSizeExceededException ex) {
-        return build(HttpStatus.PAYLOAD_TOO_LARGE, "Image is too large (max 5 MB)", List.of());
+        return build(HttpStatus.PAYLOAD_TOO_LARGE, "Request is too large", List.of());
     }
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
@@ -110,6 +124,6 @@ public class GlobalExceptionHandler {
 
     private ResponseEntity<ApiError> build(HttpStatus status, String message, List<ApiError.FieldError> fields) {
         return ResponseEntity.status(status)
-                .body(ApiError.withFields(status.value(), status.getReasonPhrase(), message, fields));
+                .body(new ApiError(status.value(), status.getReasonPhrase(), message, fields, clock.instant()));
     }
 }
