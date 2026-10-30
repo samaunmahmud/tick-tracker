@@ -60,8 +60,9 @@ public class InsightsController {
     }
 
     @Operation(summary = "Trend over time",
-            description = "Sightings per week, month or year. Periods with no sightings are included with a "
-                    + "count of 0 so the series has no gaps.")
+            description = "Sightings per week, month or year. The series covers 'from' to 'to' when given, "
+                    + "otherwise the first to the last matching sighting. Periods with no sightings are included "
+                    + "with a count of 0 so the series has no gaps. At most 2000 periods are returned.")
     @GetMapping("/trends")
     public List<TrendPoint> trends(@ParameterObject @ModelAttribute SightingFilterParams params,
                                    @Parameter(description = "week, month (default) or year")
