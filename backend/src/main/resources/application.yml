@@ -43,7 +43,7 @@ app:
     connect-timeout: 5s
     read-timeout: 20s
     max-attempts: 5
-    initial-backoff: 1s
-    max-backoff: 30s
+    initial-backoff: 5s
+    max-backoff: 60s
     sync-on-startup: ${SYNC_ON_STARTUP:true}
     sync-cron: "0 0 */6 * * *"
