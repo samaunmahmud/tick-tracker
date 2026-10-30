@@ -13,6 +13,8 @@ import com.samaun.ticktracker.sync.SyncRunRepository;
 import com.samaun.ticktracker.sync.TriggerType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -37,6 +39,7 @@ public class IngestionService {
     private final SyncRunRepository syncRunRepository;
     private final RejectedRecordRepository rejectedRecordRepository;
     private final Clock clock;
+    private final TaskExecutor taskExecutor;
     private final AtomicBoolean syncRunning = new AtomicBoolean(false);
 
     public IngestionService(ElancoClient elancoClient,
@@ -44,29 +47,58 @@ public class IngestionService {
                             SightingRepository sightingRepository,
                             SyncRunRepository syncRunRepository,
                             RejectedRecordRepository rejectedRecordRepository,
-                            Clock clock) {
+                            Clock clock,
+                            @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor) {
         this.elancoClient = elancoClient;
         this.normalizer = normalizer;
         this.sightingRepository = sightingRepository;
         this.syncRunRepository = syncRunRepository;
         this.rejectedRecordRepository = rejectedRecordRepository;
         this.clock = clock;
+        this.taskExecutor = taskExecutor;
     }
 
     public SyncRun runSync(TriggerType triggerType) {
-        if (!syncRunning.compareAndSet(false, true)) {
-            throw new SyncInProgressException();
-        }
+        claimSyncLock();
         try {
-            return sync(triggerType);
+            return complete(startRun(triggerType));
         } finally {
             syncRunning.set(false);
         }
     }
 
-    private SyncRun sync(TriggerType triggerType) {
+    public Long startSyncInBackground(TriggerType triggerType) {
+        claimSyncLock();
+        try {
+            SyncRun run = startRun(triggerType);
+            Long runId = run.getId();
+            taskExecutor.execute(() -> {
+                try {
+                    complete(run);
+                } finally {
+                    syncRunning.set(false);
+                }
+            });
+            return runId;
+        } catch (RuntimeException e) {
+            syncRunning.set(false);
+            throw e;
+        }
+    }
+
+    private void claimSyncLock() {
+        if (!syncRunning.compareAndSet(false, true)) {
+            throw new SyncInProgressException();
+        }
+    }
+
+    private SyncRun startRun(TriggerType triggerType) {
         SyncRun run = syncRunRepository.save(SyncRun.start(triggerType, clock.instant()));
         log.info("Sync {} started ({})", run.getId(), triggerType);
+        return run;
+    }
+
+    private SyncRun complete(SyncRun run) {
         try {
             importRecords(run, elancoClient.fetchAllSightings());
             run.succeed(clock.instant());

@@ -1,16 +1,19 @@
 package com.samaun.ticktracker.sync;
 
 import com.samaun.ticktracker.common.PageResponse;
-import com.samaun.ticktracker.common.SyncFailedException;
 import com.samaun.ticktracker.ingestion.IngestionService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+import java.net.URI;
 import java.util.List;
 
 @RestController
@@ -26,17 +29,23 @@ public class SyncController {
     }
 
     @PostMapping
-    public SyncRunResponse runSync() {
-        SyncRun run = ingestionService.runSync(TriggerType.MANUAL);
-        if (run.getStatus() == SyncStatus.FAILED) {
-            throw new SyncFailedException(run.getId(), run.getErrorMessage());
-        }
-        return SyncRunResponse.from(run);
+    public ResponseEntity<SyncStartedResponse> startSync() {
+        Long runId = ingestionService.startSyncInBackground(TriggerType.MANUAL);
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
+                .path("/runs/{id}")
+                .buildAndExpand(runId)
+                .toUri();
+        return ResponseEntity.accepted().location(location).body(new SyncStartedResponse(runId, SyncStatus.RUNNING));
     }
 
     @GetMapping("/runs")
     public List<SyncRunResponse> latestRuns() {
         return syncHistoryService.latestRuns();
+    }
+
+    @GetMapping("/runs/{id}")
+    public SyncRunResponse findRun(@PathVariable Long id) {
+        return syncHistoryService.findRun(id);
     }
 
     @GetMapping("/rejected")

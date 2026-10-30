@@ -15,6 +15,8 @@ import com.samaun.ticktracker.sync.SyncStatus;
 import com.samaun.ticktracker.sync.TriggerType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -46,15 +48,22 @@ class IngestionServiceTest {
 
     private final List<Sighting> savedSightings = new ArrayList<>();
     private final List<RejectedRecord> savedRejects = new ArrayList<>();
+    private final List<Runnable> queuedTasks = new ArrayList<>();
 
     private IngestionService service;
 
     @BeforeEach
     void setUp() {
         service = new IngestionService(elancoClient, new SightingNormalizer(objectMapper, NOW),
-                sightingRepository, syncRunRepository, rejectedRecordRepository, NOW);
+                sightingRepository, syncRunRepository, rejectedRecordRepository, NOW, queuedTasks::add);
 
-        when(syncRunRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+        when(syncRunRepository.save(any())).thenAnswer(call -> {
+            SyncRun run = call.getArgument(0);
+            if (run.getId() == null) {
+                ReflectionTestUtils.setField(run, "id", 42L);
+            }
+            return run;
+        });
         when(sightingRepository.saveAll(anyList())).thenAnswer(call -> {
             savedSightings.addAll(call.getArgument(0));
             return call.getArgument(0);
@@ -247,5 +256,53 @@ class IngestionServiceTest {
         verify(sightingRepository, times(3)).findExistingExternalIds(anyList());
         verify(sightingRepository, times(3)).findExistingContentHashes(anyList());
         verify(sightingRepository, times(3)).saveAll(anyList());
+    }
+
+    @Test
+    void backgroundSyncReturnsRunIdBeforeTheWorkIsDone() {
+        when(elancoClient.fetchAllSightings()).thenReturn(List.of(validRecord("a1", "2022-08-01T06:40:31")));
+
+        Long runId = service.startSyncInBackground(TriggerType.MANUAL);
+
+        assertThat(runId).isEqualTo(42L);
+        verify(elancoClient, never()).fetchAllSightings();
+        assertThat(queuedTasks).hasSize(1);
+
+        queuedTasks.get(0).run();
+
+        ArgumentCaptor<SyncRun> saved = ArgumentCaptor.forClass(SyncRun.class);
+        verify(syncRunRepository, times(2)).save(saved.capture());
+        assertThat(saved.getValue().getStatus()).isEqualTo(SyncStatus.SUCCESS);
+        assertThat(saved.getValue().getInserted()).isEqualTo(1);
+    }
+
+    @Test
+    void backgroundSyncHoldsTheLockUntilItFinishes() {
+        when(elancoClient.fetchAllSightings()).thenReturn(List.of());
+
+        service.startSyncInBackground(TriggerType.MANUAL);
+
+        assertThatThrownBy(() -> service.startSyncInBackground(TriggerType.MANUAL))
+                .isInstanceOf(SyncInProgressException.class);
+        assertThatThrownBy(() -> service.runSync(TriggerType.SCHEDULED))
+                .isInstanceOf(SyncInProgressException.class);
+
+        queuedTasks.get(0).run();
+
+        assertThat(service.runSync(TriggerType.SCHEDULED).getStatus()).isEqualTo(SyncStatus.SUCCESS);
+    }
+
+    @Test
+    void backgroundSyncReleasesTheLockWhenItCannotBeQueued() {
+        IngestionService rejectingService = new IngestionService(elancoClient, new SightingNormalizer(objectMapper, NOW),
+                sightingRepository, syncRunRepository, rejectedRecordRepository, NOW,
+                task -> {
+                    throw new IllegalStateException("executor shut down");
+                });
+        when(elancoClient.fetchAllSightings()).thenReturn(List.of());
+
+        assertThatThrownBy(() -> rejectingService.startSyncInBackground(TriggerType.MANUAL))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(rejectingService.runSync(TriggerType.MANUAL).getStatus()).isEqualTo(SyncStatus.SUCCESS);
     }
 }

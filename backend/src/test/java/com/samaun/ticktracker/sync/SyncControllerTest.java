@@ -1,5 +1,6 @@
 package com.samaun.ticktracker.sync;
 
+import com.samaun.ticktracker.common.NotFoundException;
 import com.samaun.ticktracker.common.PageResponse;
 import com.samaun.ticktracker.common.SyncInProgressException;
 import com.samaun.ticktracker.ingestion.IngestionService;
@@ -12,9 +13,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.Instant;
 import java.util.List;
 
+import static org.hamcrest.Matchers.endsWith;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -33,37 +36,39 @@ class SyncControllerTest {
     private SyncHistoryService syncHistoryService;
 
     @Test
-    void manualSyncReturnsRunSummary() throws Exception {
-        SyncRun run = SyncRun.start(TriggerType.MANUAL, STARTED);
-        run.recordProcessed(10, 2, 1, 3);
-        run.addInserted(7);
-        run.succeed(STARTED.plusSeconds(2));
-        when(ingestionService.runSync(TriggerType.MANUAL)).thenReturn(run);
+    void manualSyncStartsInBackgroundAndReturnsAccepted() throws Exception {
+        when(ingestionService.startSyncInBackground(TriggerType.MANUAL)).thenReturn(7L);
 
         mockMvc.perform(post("/api/sync"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("SUCCESS"))
-                .andExpect(jsonPath("$.trigger").value("MANUAL"))
-                .andExpect(jsonPath("$.fetched").value(10))
-                .andExpect(jsonPath("$.inserted").value(7))
-                .andExpect(jsonPath("$.duplicates").value(2));
+                .andExpect(status().isAccepted())
+                .andExpect(header().string("Location", endsWith("/api/sync/runs/7")))
+                .andExpect(jsonPath("$.runId").value(7))
+                .andExpect(jsonPath("$.status").value("RUNNING"));
     }
 
     @Test
-    void failedManualSyncReturnsBadGateway() throws Exception {
+    void findsOneRunById() throws Exception {
         SyncRun run = SyncRun.start(TriggerType.MANUAL, STARTED);
         run.fail("Elanco API still failing after 5 attempts", STARTED.plusSeconds(75));
-        when(ingestionService.runSync(TriggerType.MANUAL)).thenReturn(run);
+        when(syncHistoryService.findRun(7L)).thenReturn(SyncRunResponse.from(run));
 
-        mockMvc.perform(post("/api/sync"))
-                .andExpect(status().isBadGateway())
-                .andExpect(jsonPath("$.status").value(502))
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("still failing")));
+        mockMvc.perform(get("/api/sync/runs/7"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FAILED"))
+                .andExpect(jsonPath("$.errorMessage").value("Elanco API still failing after 5 attempts"));
+    }
+
+    @Test
+    void unknownRunReturns404() throws Exception {
+        when(syncHistoryService.findRun(99L)).thenThrow(new NotFoundException("No sync run with id 99"));
+
+        mockMvc.perform(get("/api/sync/runs/99"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
     void manualSyncWhileAnotherIsRunningReturnsConflict() throws Exception {
-        when(ingestionService.runSync(TriggerType.MANUAL)).thenThrow(new SyncInProgressException());
+        when(ingestionService.startSyncInBackground(TriggerType.MANUAL)).thenThrow(new SyncInProgressException());
 
         mockMvc.perform(post("/api/sync"))
                 .andExpect(status().isConflict())

@@ -1,5 +1,6 @@
 package com.samaun.ticktracker.sync;
 
+import com.samaun.ticktracker.common.NotFoundException;
 import com.samaun.ticktracker.common.PageResponse;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -22,6 +23,12 @@ public class SyncHistoryService {
         return syncRunRepository.findTop20ByOrderByStartedAtDesc().stream()
                 .map(SyncRunResponse::from)
                 .toList();
+    }
+
+    public SyncRunResponse findRun(Long id) {
+        return syncRunRepository.findById(id)
+                .map(SyncRunResponse::from)
+                .orElseThrow(() -> new NotFoundException("No sync run with id " + id));
     }
 
     public PageResponse<RejectedRecordResponse> rejectedRecords(int page, int size) {

@@ -67,11 +67,6 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.CONFLICT, ex.getMessage(), List.of());
     }
 
-    @ExceptionHandler(SyncFailedException.class)
-    public ResponseEntity<ApiError> handleSyncFailed(SyncFailedException ex) {
-        return build(HttpStatus.BAD_GATEWAY, ex.getMessage(), List.of());
-    }
-
     @ExceptionHandler({MethodArgumentTypeMismatchException.class, HttpMessageNotReadableException.class})
     public ResponseEntity<ApiError> handleBadRequest(Exception ex) {
         return build(HttpStatus.BAD_REQUEST, "Malformed request: " + ex.getMessage(), List.of());
