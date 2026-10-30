@@ -67,7 +67,7 @@ The Elanco API is rate-limited, returns everything in one array, can't filter by
 
 ### 2. Retries, backoff and failing safely
 
-I saw real 429s while exploring the API (8 of 25 rapid requests on one check). The client retries on 429, 5xx and network errors with exponential backoff (5s, 10s, 20s, 40s, capped at 60s), over 5 attempts and about 75 seconds in total. The API doesn't document its rate limit, so I chose a total wait of about 75 seconds to cover a typical one-minute window. If the server sends `Retry-After`, that is used instead. Other 4xx errors fail at once, because retrying won't change the answer. Sleeping goes through a small `Sleeper` interface so the tests run instantly.
+I saw real 429s while exploring the API (8 of 25 rapid requests on one check). The client retries on 429, 5xx and network errors with exponential backoff (5s, 10s, 20s, 40s, capped at 60s), over 5 attempts. The API doesn't document its rate limit, so I chose a total wait of about 75 seconds to cover a typical one-minute window. If the server sends `Retry-After`, that is used instead. Other 4xx errors fail at once, because retrying won't change the answer. Sleeping goes through a small `Sleeper` interface so the tests run instantly.
 
 *Trade-off:* a failing sync holds a background thread for over a minute. That's acceptable because it runs off the request thread and only one sync can run at a time.
 
