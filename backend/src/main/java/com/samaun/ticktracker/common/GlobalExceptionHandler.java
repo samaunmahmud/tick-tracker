@@ -27,9 +27,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> handleValidation(MethodArgumentNotValidException ex) {
         List<ApiError.FieldError> fields = ex.getBindingResult().getFieldErrors().stream()
-                .map(fe -> new ApiError.FieldError(fe.getField(), fe.getDefaultMessage()))
+                .map(fe -> new ApiError.FieldError(fe.getField(), fe.isBindingFailure()
+                        ? "has an invalid value '" + fe.getRejectedValue() + "'"
+                        : fe.getDefaultMessage()))
                 .toList();
         return build(HttpStatus.BAD_REQUEST, "Validation failed", fields);
+    }
+
+    @ExceptionHandler(InvalidRequestException.class)
+    public ResponseEntity<ApiError> handleInvalidRequest(InvalidRequestException ex) {
+        return build(HttpStatus.BAD_REQUEST, ex.getMessage(), ex.getFieldErrors());
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -52,6 +59,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(SyncInProgressException.class)
     public ResponseEntity<ApiError> handleSyncInProgress(SyncInProgressException ex) {
+        return build(HttpStatus.CONFLICT, ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(DuplicateSightingException.class)
+    public ResponseEntity<ApiError> handleDuplicateSighting(DuplicateSightingException ex) {
         return build(HttpStatus.CONFLICT, ex.getMessage(), List.of());
     }
 

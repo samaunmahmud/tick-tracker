@@ -46,4 +46,15 @@ class UkCityTest {
     void coversAllFourteenCitiesInTheFeed() {
         assertThat(UkCity.values()).hasSize(14);
     }
+
+    @Test
+    void findsRegionIgnoringCaseAndSpacing() {
+        assertThat(UkCity.findRegion("  yorkshire   AND the humber ")).contains("Yorkshire and the Humber");
+    }
+
+    @Test
+    void returnsEmptyForUnknownRegion() {
+        assertThat(UkCity.findRegion("Narnia")).isEmpty();
+        assertThat(UkCity.findRegion(null)).isEmpty();
+    }
 }

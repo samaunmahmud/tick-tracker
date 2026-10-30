@@ -1,6 +1,8 @@
 package com.samaun.ticktracker.sighting;
 
 import com.samaun.ticktracker.ingestion.NormalizedSighting;
+import com.samaun.ticktracker.reference.TickSpecies;
+import com.samaun.ticktracker.reference.UkCity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -53,6 +55,23 @@ public class Sighting {
         sighting.species = normalized.species().commonName();
         sighting.latinName = normalized.species().latinName();
         sighting.source = SightingSource.ELANCO_API;
+        sighting.createdAt = createdAt;
+        return sighting;
+    }
+
+    public static Sighting fromUserReport(LocalDateTime sightedAt, UkCity city, TickSpecies species,
+                                          String notes, Instant createdAt) {
+        Sighting sighting = new Sighting();
+        sighting.contentHash = ContentHash.of(sightedAt, city, species);
+        sighting.sightedAt = sightedAt;
+        sighting.city = city.displayName();
+        sighting.region = city.region();
+        sighting.latitude = city.latitude();
+        sighting.longitude = city.longitude();
+        sighting.species = species.commonName();
+        sighting.latinName = species.latinName();
+        sighting.notes = notes;
+        sighting.source = SightingSource.USER_REPORT;
         sighting.createdAt = createdAt;
         return sighting;
     }

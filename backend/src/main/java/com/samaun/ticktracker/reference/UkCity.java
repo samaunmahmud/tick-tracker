@@ -1,5 +1,6 @@
 package com.samaun.ticktracker.reference;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -52,6 +53,17 @@ public enum UkCity {
             return Optional.empty();
         }
         return Optional.ofNullable(BY_NAME.get(normalize(name)));
+    }
+
+    public static Optional<String> findRegion(String name) {
+        if (name == null) {
+            return Optional.empty();
+        }
+        String wanted = normalize(name);
+        return Arrays.stream(values())
+                .map(UkCity::region)
+                .filter(region -> normalize(region).equals(wanted))
+                .findFirst();
     }
 
     private static String normalize(String value) {
