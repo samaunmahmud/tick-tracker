@@ -14,9 +14,6 @@ spring:
         jdbc:
           batch_size: 200
         order_inserts: true
-  servlet:
-    multipart:
-      max-request-size: 1MB
 
 server:
   port: 8080
