@@ -2,7 +2,6 @@
 .env
 
 backend/target/
-backend/uploads/
 *.class
 
 .idea/

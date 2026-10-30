@@ -16,8 +16,7 @@ spring:
         order_inserts: true
   servlet:
     multipart:
-      max-file-size: 5MB
-      max-request-size: 6MB
+      max-request-size: 1MB
 
 server:
   port: 8080
@@ -36,8 +35,6 @@ springdoc:
 app:
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:3000}
-  upload:
-    dir: ${UPLOAD_DIR:./uploads}
   elanco:
     base-url: ${ELANCO_API_BASE_URL:https://dev-task.elancoapps.com/data}
     connect-timeout: 5s

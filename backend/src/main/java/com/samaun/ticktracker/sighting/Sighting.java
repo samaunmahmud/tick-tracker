@@ -120,10 +120,6 @@ public class Sighting {
         return notes;
     }
 
-    public String getImageFilename() {
-        return imageFilename;
-    }
-
     public SightingSource getSource() {
         return source;
     }
