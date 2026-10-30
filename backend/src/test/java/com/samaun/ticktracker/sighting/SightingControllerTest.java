@@ -191,7 +191,17 @@ class SightingControllerTest {
     @Test
     void findByIdReturns400ForMalformedId() throws Exception {
         mockMvc.perform(get("/api/sightings/not-a-uuid"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("id"))
+                .andExpect(jsonPath("$.fieldErrors[0].message").value("has an invalid value 'not-a-uuid'"));
+    }
+
+    @Test
+    void errorTimestampComesFromTheInjectedClock() throws Exception {
+        mockMvc.perform(get("/api/sightings").param("city", "Atlantis"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.timestamp").value("2026-10-30T12:00:00Z"));
     }
 
     @Test

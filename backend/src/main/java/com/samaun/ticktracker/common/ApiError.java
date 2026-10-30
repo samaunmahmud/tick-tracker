@@ -11,12 +11,4 @@ public record ApiError(
         Instant timestamp
 ) {
     public record FieldError(String field, String message) {}
-
-    public static ApiError of(int status, String error, String message) {
-        return new ApiError(status, error, message, List.of(), Instant.now());
-    }
-
-    public static ApiError withFields(int status, String error, String message, List<FieldError> fieldErrors) {
-        return new ApiError(status, error, message, fieldErrors, Instant.now());
-    }
 }

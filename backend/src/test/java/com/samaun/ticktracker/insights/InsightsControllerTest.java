@@ -2,11 +2,13 @@ package com.samaun.ticktracker.insights;
 
 import com.samaun.ticktracker.common.ApiError.FieldError;
 import com.samaun.ticktracker.common.InvalidRequestException;
+import com.samaun.ticktracker.config.ClockConfig;
 import com.samaun.ticktracker.sighting.SightingFilterParams;
 import com.samaun.ticktracker.sighting.SightingSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -23,6 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(InsightsController.class)
+@Import(ClockConfig.class)
 class InsightsControllerTest {
 
     @Autowired

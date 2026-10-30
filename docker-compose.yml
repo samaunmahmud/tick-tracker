@@ -21,16 +21,12 @@ services:
       DB_URL: jdbc:postgresql://db:5432/ticktracker
       DB_USER: ticktracker
       DB_PASSWORD: ticktracker
-      UPLOAD_DIR: /data/uploads
       ELANCO_API_BASE_URL: ${ELANCO_API_BASE_URL:-https://dev-task.elancoapps.com/data}
     ports:
       - "8080:8080"
-    volumes:
-      - uploads:/data/uploads
     depends_on:
       db:
         condition: service_healthy
 
 volumes:
   db-data:
-  uploads:

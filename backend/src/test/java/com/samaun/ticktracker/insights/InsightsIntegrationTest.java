@@ -83,6 +83,10 @@ class InsightsIntegrationTest {
                 new NormalizedSighting(id, sightedAt, city, species, ContentHash.of(sightedAt, city, species)), NOW);
     }
 
+    private static SightingFilterParams range(String from, String to) {
+        return new SightingFilterParams(from, to, null, null, null);
+    }
+
     private static SightingFilterParams region(String region) {
         return new SightingFilterParams(null, null, null, region, null);
     }
@@ -182,6 +186,49 @@ class InsightsIntegrationTest {
     void trendRespectsFilters() {
         assertThat(insights.trends(region("london"), "month"))
                 .containsExactly(new TrendPoint(LocalDate.of(2023, 12, 1), 1));
+    }
+
+    @Test
+    void monthlyTrendSpansTheWholeRequestedRange() {
+        assertThat(insights.trends(range("2023-11-01", "2024-04-30"), "month"))
+                .extracting(TrendPoint::periodStart, TrendPoint::count)
+                .containsExactly(
+                        tuple(LocalDate.of(2023, 11, 1), 0L),
+                        tuple(LocalDate.of(2023, 12, 1), 1L),
+                        tuple(LocalDate.of(2024, 1, 1), 2L),
+                        tuple(LocalDate.of(2024, 2, 1), 0L),
+                        tuple(LocalDate.of(2024, 3, 1), 1L),
+                        tuple(LocalDate.of(2024, 4, 1), 0L));
+    }
+
+    @Test
+    void trendWithOnlyFromStartsThereAndEndsAtTheLastSighting() {
+        List<TrendPoint> months = insights.trends(range("2023-10-15", null), "month");
+
+        assertThat(months.get(0)).isEqualTo(new TrendPoint(LocalDate.of(2023, 10, 1), 0));
+        assertThat(months.get(months.size() - 1)).isEqualTo(new TrendPoint(LocalDate.of(2024, 3, 1), 1));
+        assertThat(months).hasSize(6);
+    }
+
+    @Test
+    void weeklyRangeStartsOnTheMondayOfTheFromDate() {
+        assertThat(insights.trends(range("2024-01-03", "2024-01-10"), "week"))
+                .containsExactly(new TrendPoint(LocalDate.of(2024, 1, 1), 1), new TrendPoint(LocalDate.of(2024, 1, 8), 0));
+    }
+
+    @Test
+    void requestedRangeWithNoSightingsIsAllZeros() {
+        List<TrendPoint> months = insights.trends(range("2025-01-01", "2025-12-31"), "month");
+
+        assertThat(months).hasSize(12).extracting(TrendPoint::count).containsOnly(0L);
+        assertThat(months.get(0).periodStart()).isEqualTo(LocalDate.of(2025, 1, 1));
+    }
+
+    @Test
+    void rejectsARangeWithTooManyPeriods() {
+        assertThatThrownBy(() -> insights.trends(range("0001-01-01", null), "week"))
+                .isInstanceOfSatisfying(InvalidRequestException.class, e ->
+                        assertThat(e.getFieldErrors()).extracting(error -> error.field()).containsExactly("interval"));
     }
 
     @Test

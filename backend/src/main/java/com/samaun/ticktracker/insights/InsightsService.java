@@ -22,6 +22,8 @@ import java.util.Map;
 @Service
 public class InsightsService {
 
+    private static final int MAX_TREND_POINTS = 2000;
+
     private final NamedParameterJdbcTemplate jdbc;
 
     public InsightsService(NamedParameterJdbcTemplate jdbc) {
@@ -89,7 +91,10 @@ public class InsightsService {
         SqlFilter sqlFilter = toSql(filter);
         MapSqlParameterSource parameters = sqlFilter.parameters()
                 .addValue("truncateTo", interval.truncateTo())
-                .addValue("step", interval.step());
+                .addValue("step", interval.step())
+                .addValue("rangeStart", filter.from())
+                .addValue("rangeEnd", filter.to())
+                .addValue("pointLimit", MAX_TREND_POINTS + 1);
         String sql = """
                 WITH counts AS (
                     SELECT date_trunc(:truncateTo, sighted_at) AS period, count(*) AS sightings
@@ -98,7 +103,8 @@ public class InsightsService {
                     GROUP BY 1
                 ),
                 bounds AS (
-                    SELECT min(period) AS first_period, max(period) AS last_period
+                    SELECT COALESCE(date_trunc(:truncateTo, CAST(:rangeStart AS TIMESTAMP)), min(period)) AS first_period,
+                           COALESCE(date_trunc(:truncateTo, CAST(:rangeEnd AS TIMESTAMP)), max(period)) AS last_period
                     FROM counts
                 )
                 SELECT series.period, COALESCE(counts.sightings, 0) AS sightings
@@ -106,11 +112,17 @@ public class InsightsService {
                 CROSS JOIN generate_series(bounds.first_period, bounds.last_period, CAST(:step AS INTERVAL)) AS series(period)
                 LEFT JOIN counts ON counts.period = series.period
                 ORDER BY series.period
+                LIMIT :pointLimit
                 """.formatted(sqlFilter.whereClause());
 
-        return jdbc.query(sql, parameters, (row, rowNumber) -> new TrendPoint(
+        List<TrendPoint> points = jdbc.query(sql, parameters, (row, rowNumber) -> new TrendPoint(
                 row.getObject("period", LocalDateTime.class).toLocalDate(),
                 row.getLong("sightings")));
+        if (points.size() > MAX_TREND_POINTS) {
+            throw new InvalidRequestException(List.of(new FieldError("interval", "this date range has more than "
+                    + MAX_TREND_POINTS + " " + interval.truncateTo() + "s; use a longer interval or a shorter range")));
+        }
+        return points;
     }
 
     public List<SeasonalPoint> seasonal(SightingFilterParams params) {
