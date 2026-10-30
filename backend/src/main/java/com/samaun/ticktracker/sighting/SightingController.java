@@ -30,10 +30,11 @@ public class SightingController {
 
     @GetMapping
     public PageResponse<SightingResponse> search(
-            @ModelAttribute SightingSearchParams params,
+            @ModelAttribute SightingFilterParams params,
+            @RequestParam(required = false) String sort,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        return sightingService.search(params, page, size);
+        return sightingService.search(params, sort, page, size);
     }
 
     @GetMapping("/{id}")

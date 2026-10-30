@@ -1,11 +1,10 @@
 package com.samaun.ticktracker.sighting;
 
-public record SightingSearchParams(
+public record SightingFilterParams(
         String from,
         String to,
         String city,
         String region,
-        String species,
-        String sort
+        String species
 ) {
 }

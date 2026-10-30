@@ -49,10 +49,6 @@ TODO
 
 TODO, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-## Use of AI
-
-TODO
-
 ## Video walkthrough
 
 TODO

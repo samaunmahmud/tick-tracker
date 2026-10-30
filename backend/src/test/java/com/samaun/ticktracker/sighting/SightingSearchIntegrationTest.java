@@ -54,35 +54,35 @@ class SightingSearchIntegrationTest {
         return page.content().stream().map(SightingResponse::city).toList();
     }
 
-    private SightingSearchParams params(String from, String to, String city, String region, String species, String sort) {
-        return new SightingSearchParams(from, to, city, region, species, sort);
+    private PageResponse<SightingResponse> search(String from, String to, String city, String region,
+                                                  String species, String sort, int page, int size) {
+        return service.search(new SightingFilterParams(from, to, city, region, species), sort, page, size);
     }
 
     @Test
     void dateOnlyBoundsIncludeTheWholeOfBothDays() {
-        PageResponse<SightingResponse> january = service.search(params("2024-01-01", "2024-01-31", null, null, null, "oldest"), 0, 20);
+        PageResponse<SightingResponse> january = search("2024-01-01", "2024-01-31", null, null, null, "oldest", 0, 20);
 
         assertThat(cities(january)).containsExactly("Leeds", "Sheffield");
     }
 
     @Test
     void filtersByRegionAndSpeciesTogether() {
-        PageResponse<SightingResponse> result = service.search(
-                params(null, null, null, "yorkshire and the humber", "Ixodes apronophorus", null), 0, 20);
+        PageResponse<SightingResponse> result = search(null, null, null, "yorkshire and the humber", "Ixodes apronophorus", null, 0, 20);
 
         assertThat(cities(result)).containsExactly("Sheffield", "Leeds");
     }
 
     @Test
     void filtersByCity() {
-        assertThat(cities(service.search(params(null, null, "LONDON", null, null, null), 0, 20)))
+        assertThat(cities(search(null, null, "LONDON", null, null, null, 0, 20)))
                 .containsExactly("London");
     }
 
     @Test
     void sortsNewestFirstAndPages() {
-        PageResponse<SightingResponse> firstPage = service.search(params(null, null, null, null, null, null), 0, 3);
-        PageResponse<SightingResponse> secondPage = service.search(params(null, null, null, null, null, null), 1, 3);
+        PageResponse<SightingResponse> firstPage = search(null, null, null, null, null, null, 0, 3);
+        PageResponse<SightingResponse> secondPage = search(null, null, null, null, null, null, 1, 3);
 
         assertThat(firstPage.content()).extracting(SightingResponse::sightedAt)
                 .containsExactly(LocalDateTime.of(2024, 2, 1, 0, 0), LocalDateTime.of(2024, 1, 31, 23, 59, 59),
