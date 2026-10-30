@@ -67,7 +67,7 @@ The Elanco API is rate-limited, returns everything in one array, can't filter by
 
 ### 2. Retries, backoff and failing safely
 
-I saw real 429s while exploring the API (8 of 25 rapid requests on one check). The client retries on 429, 5xx and network errors with exponential backoff (5s, 10s, 20s, 40s, capped at 60s), over 5 attempts and about 75 seconds in total, which outlasts a one-minute limit window. If the server sends `Retry-After`, that is used instead. Other 4xx errors fail at once, because retrying won't change the answer. Sleeping goes through a small `Sleeper` interface so the tests run instantly.
+I saw real 429s while exploring the API (8 of 25 rapid requests on one check). The client retries on 429, 5xx and network errors with exponential backoff (5s, 10s, 20s, 40s, capped at 60s), over 5 attempts and about 75 seconds in total. The API doesn't document its rate limit, so I chose a total wait of about 75 seconds to cover a typical one-minute window. If the server sends `Retry-After`, that is used instead. Other 4xx errors fail at once, because retrying won't change the answer. Sleeping goes through a small `Sleeper` interface so the tests run instantly.
 
 *Trade-off:* a failing sync holds a background thread for over a minute. That's acceptable because it runs off the request thread and only one sync can run at a time.
 
@@ -97,7 +97,7 @@ Grouping 1000 rows in Java would work, but SQL is shorter, uses the indexes, and
 
 ### 7. One error format
 
-Everything goes through `GlobalExceptionHandler`. Validation problems are a 400 with one entry per field, then 404 for a missing resource, 409 for a duplicate report or a sync already running, and 413 for an oversized request. Anything unexpected is logged in full and returns a generic 500 with no internal details.
+Everything goes through `GlobalExceptionHandler`. Validation problems are a 400 with one entry per field, and a body that isn't valid JSON is a 400 "Malformed request body". Then 404 is for a missing resource and 409 for a duplicate report or a sync already running. Anything unexpected is logged in full and returns a generic 500 with no internal details.
 
 ### 8. Honest predictions
 

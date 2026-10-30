@@ -1,5 +1,6 @@
 package com.samaun.ticktracker.sighting;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.samaun.ticktracker.config.ClockConfig;
 import com.samaun.ticktracker.reference.TickSpecies;
 import com.samaun.ticktracker.reference.UkCity;
@@ -15,6 +16,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
@@ -23,7 +25,9 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -36,6 +40,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -58,6 +63,9 @@ class SightingControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
     @MockitoBean
     private SightingRepository repository;
 
@@ -77,18 +85,20 @@ class SightingControllerTest {
         return pageable.getValue();
     }
 
-    private MockHttpServletRequestBuilder report(String sightedAt, String city, String species) {
-        MockHttpServletRequestBuilder request = multipart("/api/sightings");
-        if (sightedAt != null) {
-            request.param("sightedAt", sightedAt);
-        }
-        if (city != null) {
-            request.param("city", city);
-        }
-        if (species != null) {
-            request.param("species", species);
-        }
-        return request;
+    private MockHttpServletRequestBuilder report(String sightedAt, String city, String species) throws Exception {
+        return report(sightedAt, city, species, null);
+    }
+
+    private MockHttpServletRequestBuilder report(String sightedAt, String city, String species, String notes)
+            throws Exception {
+        Map<String, String> body = new HashMap<>();
+        body.put("sightedAt", sightedAt);
+        body.put("city", city);
+        body.put("species", species);
+        body.put("notes", notes);
+        return post("/api/sightings")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(body));
     }
 
     @Test
@@ -212,7 +222,7 @@ class SightingControllerTest {
             return saved;
         });
 
-        mockMvc.perform(report("2024-05-01T10:00:00", " manchester ", "marsh tick").param("notes", "  On my dog  "))
+        mockMvc.perform(report("2024-05-01T10:00:00", " manchester ", "marsh tick", "  On my dog  "))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", endsWith("/api/sightings/" + ID)))
                 .andExpect(jsonPath("$.city").value("Manchester"))
@@ -254,8 +264,29 @@ class SightingControllerTest {
     }
 
     @Test
+    void reportRejectsMalformedJson() throws Exception {
+        mockMvc.perform(post("/api/sightings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sightedAt\": \"2024-05-01T10:00:00\", \"city\": "))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Malformed request body"))
+                .andExpect(jsonPath("$.fieldErrors").isEmpty());
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void reportRejectsFormData() throws Exception {
+        mockMvc.perform(multipart("/api/sightings")
+                        .param("sightedAt", "2024-05-01T10:00:00")
+                        .param("city", "Leeds")
+                        .param("species", "Marsh tick"))
+                .andExpect(status().isUnsupportedMediaType());
+        verify(repository, never()).save(any());
+    }
+
+    @Test
     void reportRejectsNotesOver500Characters() throws Exception {
-        mockMvc.perform(report("2024-05-01T10:00:00", "Leeds", "Marsh tick").param("notes", "x".repeat(501)))
+        mockMvc.perform(report("2024-05-01T10:00:00", "Leeds", "Marsh tick", "x".repeat(501)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("notes"));
     }

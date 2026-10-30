@@ -1,5 +1,6 @@
 package com.samaun.ticktracker.common;
 
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,6 +83,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiError> handleUnreadableBody(HttpMessageNotReadableException ex) {
+        if (ex.getCause() instanceof InvalidFormatException invalid && !invalid.getPath().isEmpty()) {
+            String field = invalid.getPath().get(invalid.getPath().size() - 1).getFieldName();
+            return build(HttpStatus.BAD_REQUEST, "Validation failed",
+                    List.of(new ApiError.FieldError(field, "has an invalid value '" + invalid.getValue() + "'")));
+        }
         return build(HttpStatus.BAD_REQUEST, "Malformed request body", List.of());
     }
 
