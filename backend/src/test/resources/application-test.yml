@@ -1,0 +1,3 @@
+app:
+  elanco:
+    sync-on-startup: false

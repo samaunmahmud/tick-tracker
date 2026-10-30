@@ -12,6 +12,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -37,6 +38,26 @@ public class GlobalExceptionHandler {
                 .map(v -> new ApiError.FieldError(v.getPropertyPath().toString(), v.getMessage()))
                 .toList();
         return build(HttpStatus.BAD_REQUEST, "Validation failed", fields);
+    }
+
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ResponseEntity<ApiError> handleMethodValidation(HandlerMethodValidationException ex) {
+        List<ApiError.FieldError> fields = ex.getParameterValidationResults().stream()
+                .flatMap(result -> result.getResolvableErrors().stream()
+                        .map(error -> new ApiError.FieldError(
+                                result.getMethodParameter().getParameterName(), error.getDefaultMessage())))
+                .toList();
+        return build(HttpStatus.BAD_REQUEST, "Validation failed", fields);
+    }
+
+    @ExceptionHandler(SyncInProgressException.class)
+    public ResponseEntity<ApiError> handleSyncInProgress(SyncInProgressException ex) {
+        return build(HttpStatus.CONFLICT, ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(SyncFailedException.class)
+    public ResponseEntity<ApiError> handleSyncFailed(SyncFailedException ex) {
+        return build(HttpStatus.BAD_GATEWAY, ex.getMessage(), List.of());
     }
 
     @ExceptionHandler({MethodArgumentTypeMismatchException.class, HttpMessageNotReadableException.class})
