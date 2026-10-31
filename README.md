@@ -13,6 +13,11 @@ You need:
 - Java 21, only if you want to run the API outside Docker or run the tests
 
 ```bash
+git clone https://github.com/samaunmahmud/tick-tracker.git
+cd tick-tracker
+```
+
+```bash
 docker compose up --build
 ```
 
