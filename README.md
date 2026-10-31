@@ -174,4 +174,4 @@ I used an AI coding assistant during this project. I made the design decisions, 
 
 ## Video walkthrough
 
-Link: (to be added)
+[Watch the walkthrough on YouTube](https://youtu.be/UuWQCXaZxdk)
